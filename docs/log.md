@@ -2,6 +2,11 @@
 
 Read this first when starting a new chat in this repo. Add an entry at the end of every session.
 
+## 2026-10-30 (late) - Summits Lab pilot (pipeline v2 in practice)
+- Owner chose HYBRID style, wants crisp HD, sparkles/shimmer/glimmer, strong sunsets, crisp snowy peaks with clouds; "experiment, find our happy place". Asked for 1-2 scenes redone to iterate on, and for places online to browse art styles (given in works/summits-lab/notes.md).
+- Built `works/summits-lab` (Stillness + Summit, real Poly Haven sky photos, raymarched terrain, bloom). Independent critic agent used; fixed sun direction, cloud layers, water. Weakest remaining: the cloud sea (see notes).
+- NEXT: owner feedback on the pilot; then fix cloud sea, port to full film (+ audio), then redo Roots/Middle/Finale (lantern road) with the same pipeline. Assets live in works/<slug>/assets with CREDITS.md.
+
 ## 2026-10-30 (night) - Process reset
 - Owner loved Between Summits (sound, timing, text) but called individual assets (posts, mountains, water) "MS Paint". Diagnosis in `docs/pipeline.md`: assets were ~20-line procedural sketches, self-reviewed against my own last frame, one revision pass. Fix: art bible, per-asset tasks with real references, separate critic, >=4 iterations, real CC0 assets (Poly Haven/ambientCG reachable), deliberate style choice.
 - OPEN DECISION for owner: photoreal composite from real assets vs deliberate stylisation (paper-cut/painterly) vs hybrid.

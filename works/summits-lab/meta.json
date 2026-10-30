@@ -1,0 +1,6 @@
+{
+  "title": "Summits Lab",
+  "tags": ["pilot", "webgl", "photographic-sky", "raymarching", "bloom"],
+  "model": "Claude Sonnet 5.5",
+  "prompt": "Rebuild two scenes (Stillness, Summit) from Between Summits with real photographic assets, hybrid photoreal/stylised, crisp HD, strong sunsets, snowy peaks with clouds, sparkle and shimmer. Pilot of the pipeline v2: art bible, real references, per-asset passes, independent critic."
+}

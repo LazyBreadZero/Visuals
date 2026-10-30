@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Summits Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500;1,300&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* Pilot: two scenes re-made with real photographic skies (Poly Haven, CC0), a raymarched terrain, linear light, filmic tonemap and bloom. */
+:root{--bg:#050507;--paper:#f3ead9;--dim:rgba(243,234,217,.6);--serif:'Cormorant Garamond',Georgia,serif;--mono:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--paper);overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#caps{position:fixed;left:0;right:0;bottom:7%;z-index:3;text-align:center;pointer-events:none;padding:0 24px}
+.cap{position:absolute;left:0;right:0;bottom:0;opacity:0}
+.cap span{display:block;opacity:0;font:300 clamp(20px,3.1vw,44px)/1.38 var(--serif);letter-spacing:.012em;text-shadow:0 2px 24px rgba(0,0,0,.7),0 0 3px rgba(0,0,0,.5)}
+#chap{position:fixed;left:20px;top:7%;z-index:3;font:400 clamp(10px,1.1vw,13px)/1 var(--mono);letter-spacing:.32em;color:var(--dim);opacity:0;pointer-events:none;text-transform:uppercase}
+.card{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px;background:radial-gradient(ellipse at 50% 55%,rgba(5,5,7,.2),rgba(5,5,7,.75))}
+.card h1{margin:0;font:300 clamp(36px,8vw,110px)/.95 var(--serif);letter-spacing:.2em;text-indent:.2em;text-transform:uppercase;text-shadow:0 4px 40px rgba(0,0,0,.6)}
+.card p{margin:0;max-width:34em;font:300 clamp(16px,1.9vw,24px)/1.5 var(--serif);font-style:italic;color:var(--dim)}
+.card .note{font:400 11px/1.7 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:rgba(243,234,217,.4);font-style:normal}
+.btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+button{all:unset;cursor:pointer;font:400 12px/1 var(--mono);letter-spacing:.28em;text-transform:uppercase;padding:15px 22px;border:1px solid rgba(243,234,217,.5);color:var(--paper);transition:background .4s,color .4s}
+button:hover,button:focus-visible{background:var(--paper);color:#0a0a0c}
+button[disabled]{opacity:.4;cursor:wait}
+[hidden]{display:none!important}
+#credit{position:fixed;right:16px;bottom:10px;z-index:3;font:400 10px var(--mono);letter-spacing:.18em;color:rgba(243,234,217,.35);text-transform:uppercase;pointer-events:none}
+#nogl{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;font:300 22px/1.5 var(--serif)}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Two short generative scenes: a still lake at dusk, and a snow summit above a sea of cloud at sunset."></canvas>
+<div id="chap"></div><div id="caps"></div>
+<div id="credit">Skies: Poly Haven · CC0</div>
+<div class="card" id="intro">
+  <h1>Summits<br>Lab</h1>
+  <p>Two scenes rebuilt with photographic skies, real terrain lighting and bloom.</p>
+  <div class="btns"><button id="goBoth" disabled>Loading…</button><button id="goLake" disabled>Lake only</button><button id="goSummit" disabled>Summit only</button></div>
+  <div class="note">about 60 seconds · silent pilot</div>
+</div>
+<div class="card" id="outro" hidden style="background:transparent;justify-content:flex-end;padding-bottom:5%"><div class="btns"><button id="again">Watch again</button></div></div>
+<div id="nogl" hidden>This needs WebGL 2. Try a recent Chrome, Safari or Firefox.</div>
+
+<script>
+// ============ timeline ============
+const LEN = 60, START = [0, 28], FADE = 3, SCENE_NAMES = ['Stillness', 'Summit'];
+const CAPS = [
+  [3, 9.5,   'I say I want calm.'],
+  [11, 18.5, 'Then I go looking|for the edge of a cliff.'],
+  [20, 26.2, 'Both of them are me.'],
+  [32, 39,   'And then, a summit.|A wave that lifts. A pitch that lands.'],
+  [41, 50,   'For a moment, everything is clear.|I know exactly why I am here.'],
+];
+const SUN = { lake: { u: .611, lat: .026 }, summit: { u: .5986, lat: .026 } };
+
+// ============ shaders ============
+const VS = `#version 300 es
+void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); gl_Position=vec4(p*2.-1.,0.,1.); }`;
+
+const FS_SCENE = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uT; uniform float uW[2]; uniform float uS[2];
+uniform sampler2D uSkyA; uniform sampler2D uSkyB;
+uniform vec2 uSunA; uniform vec2 uSunB;            // (u, latitude radians) of the sun inside each sky plate
+out vec4 outc;
+const float PI=3.14159265, CROP=.5498;
+
+float sm(float a,float b,float x){ float t=clamp((x-a)/(b-a),0.,1.); return t*t*(3.-2.*t); }
+float h11(float n){ return fract(sin(n*127.1+11.7)*43758.5453); }
+float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+float fbm(vec2 p){ float a=.5,s=0.; for(int i=0;i<5;i++){ s+=a*vn(p); p=p*2.03+vec2(17.1,9.2); a*=.5; } return s; }
+float fbm3(vec2 p){ float a=.5,s=0.; for(int i=0;i<3;i++){ s+=a*vn(p); p=p*2.03+vec2(17.1,9.2); a*=.5; } return s; }
+mat2 R(float a){ float c=cos(a),s=sin(a); return mat2(c,-s,s,c); }
+vec3 rotY(vec3 v,float a){ float c=cos(a),s=sin(a); return vec3(v.x*c+v.z*s,v.y,-v.x*s+v.z*c); }
+vec3 sunDir(vec2 s){ float ph=(s.x-.5)*2.*PI; return vec3(sin(ph)*cos(s.y),sin(s.y),cos(ph)*cos(s.y)); }
+vec3 lin(vec3 c){ return pow(c,vec3(2.2)); }
+// equirect sample of a sky plate (stored: zenith at v=0, cropped to CROP of the full height)
+vec3 skyL(sampler2D s,vec3 d,float lod){
+  float u=atan(d.x,d.z)/(2.*PI)+.5, v=(.5*PI-asin(clamp(d.y,-1.,1.)))/PI/CROP;
+  return lin(textureLod(s,vec2(u,clamp(v,0.,1.)),lod).rgb)*.78;
+}
+
+// ================= SUMMIT : raymarched snow peaks over a sea of cloud, real sunset sky =================
+float cone(vec2 p,vec2 c,float h,float r){ float d=length(p-c)/r; return h*pow(max(1.-d,0.),1.3); }
+float rid(vec2 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ float n=1.-abs(2.*vn(p)-1.); s+=a*n*n; p=R(.7)*p*2.05+vec2(3.1,1.7); a*=.5; } return s; }
+float Hm(vec2 p){
+  float m=cone(p,vec2(-3.6,11.5),3.7,7.4);
+  m=max(m,cone(p,vec2(2.9,19.),2.8,6.6));
+  m=max(m,cone(p,vec2(8.4,13.5),2.2,4.8));
+  m=max(m,cone(p,vec2(-10.,23.),2.8,8.));
+  m=max(m,cone(p,vec2(-.5,36.),3.2,11.));
+  m=max(m,cone(p,vec2(14.,30.),2.5,8.));
+  return m;
+}
+float Hh(vec2 p){ float m=Hm(p); return m*(.5+.85*rid(p*.42)); }
+float marchT(vec3 ro,vec3 rd){
+  float t=.4, tp=.4;
+  for(int i=0;i<120;i++){
+    vec3 p=ro+rd*t; float d=p.y-Hh(p.xz);
+    if(d<.002*t){
+      float a=tp,b=t;                                   // bisection refine between last outside and first inside
+      for(int k=0;k<6;k++){ float m=.5*(a+b); vec3 q=ro+rd*m; if(q.y-Hh(q.xz)>0.) a=m; else b=m; }
+      return .5*(a+b);
+    }
+    tp=t; t+=max(d*.45,.005*t);
+    if(t>70.||(p.y>5.4&&rd.y>0.)) break;
+  }
+  return -1.;
+}
+float cloudH(vec2 wq){ return fbm3(wq*1.0)*.62+fbm3(wq*2.4)*.30+vn(wq*5.2)*.08; }
+vec4 cloudLayer(vec2 q,float k,float t,vec3 sunL){
+  vec2 xz=q*(1.15+.18*k)+vec2(t*(.03+.01*k),k*7.3);
+  float w=fbm3(xz*.9);
+  vec2 wq=xz+vec2(w,w*.7)*.9;                                   // strong warp gives rolling, swirled billows
+  float dn=cloudH(wq);
+  vec2 off=sunL.xz*(.10+.03*k);
+  float dn2=cloudH(wq+off);
+  float a=sm(.32,.54,dn)*(1.-.10*k);
+  float lit=clamp((dn-dn2)*8.+.55,0.,1.);
+  float core=sm(.28,.70,dn);                                    // thick billow cores are brighter on top, blue in the valleys
+  vec3 shadowC=vec3(.12,.13,.27)*(1.-.12*k), litC=vec3(1.25,.74,.45)*(1.-.12*k);
+  vec3 c=mix(shadowC,litC,lit*(.35+.65*core));
+  c+=vec3(1.25,.9,.6)*a*(1.-a)*4.*lit*.22;
+  return vec4(c,a);
+}
+float terrShadow(vec3 p,vec3 l){
+  float sh=1.,ts=.08;
+  for(int i=0;i<14;i++){ vec3 q=p+l*ts; float hh=q.y-Hh(q.xz); sh=min(sh,6.*hh/ts); ts+=.16+ts*.16; if(sh<.02) break; }
+  return clamp(sh,0.,1.);
+}
+vec3 sSummit(vec2 p,float t){
+  float yaw0=(${SUN.summit.u.toFixed(4)}-.5)*2.*PI-(1.28-.006*t);        // sun well to the right: raking light; it drifts toward frame
+  vec3 sunW=sunDir(uSunA), sunL=rotY(sunW,-yaw0);
+  vec3 ro=vec3(0.,1.55+t*.005,t*.09);
+  vec3 fw=normalize(vec3(0.,-.08,1.)), rt=vec3(1.,0.,0.), up=cross(fw,rt);
+  float fov=1.15;
+  vec3 rd=normalize(fw+rt*p.x*fov+up*p.y*fov);
+  vec3 wd=rotY(rd,yaw0);
+  vec3 hzc=skyL(uSkyA,rotY(normalize(vec3(rd.x,.03,rd.z)),yaw0),3.);
+  vec3 sky=skyL(uSkyA,wd,0.);
+  float sd=max(dot(wd,sunW),0.);
+  sky+=vec3(2.2,1.3,.7)*(pow(sd,1500.)*6.+pow(sd,90.)*.07);
+  vec3 base=sky;
+  float tT=marchT(ro,rd), dist=60.;
+  vec3 sunC=vec3(2.3,1.28,.62);
+  if(tT>0.){
+    dist=tT;
+    vec3 pp=ro+rd*tT;
+    float e=.004+.0016*tT;
+    vec3 n=normalize(vec3(Hh(pp.xz-vec2(e,0.))-Hh(pp.xz+vec2(e,0.)),2.*e,Hh(pp.xz-vec2(0.,e))-Hh(pp.xz+vec2(0.,e))));
+    vec2 bq=pp.xz*16.+pp.y*5.; float bb=vn(bq);
+    n=normalize(n+vec3(vn(bq+vec2(.7,0.))-bb,0.,vn(bq+vec2(0.,.7))-bb)*.55+vec3(vn(pp.xz*45.+3.)-.5,0.,vn(pp.zx*45.+7.)-.5)*.18);
+    float ndl=max(dot(n,sunL),0.);
+    float sh=1.,ts=.06;
+    for(int i=0;i<22;i++){ vec3 q=pp+n*.02+sunL*ts; float hh=q.y-Hh(q.xz); sh=min(sh,7.*hh/ts); ts+=.1+ts*.12; if(sh<.02) break; }
+    sh=clamp(sh,0.,1.);
+    float strata=fbm3(vec2(pp.y*4.+fbm3(pp.xz*1.1)*3.,pp.x*.7+pp.z*.7))*.8+.1;
+    float grain=fbm3(pp.xz*12.+pp.y*9.);
+    vec3 rock=mix(vec3(.022,.020,.024),vec3(.15,.115,.095),strata)*(.55+.9*grain);
+    float snowAmt=sm(.52,.80,n.y+(fbm(pp.xz*2.6)-.5)*.45+pp.y*.06-.18);
+    vec3 snow=vec3(.90,.93,1.)*(.86+.2*grain);
+    vec3 alb=mix(rock,snow,snowAmt);
+    vec3 amb=skyL(uSkyA,rotY(n,yaw0),5.);
+    vec3 bounce=vec3(1.1,.75,.62)*.30*clamp(.5-.5*n.y,0.,1.);
+    vec3 c=alb*(sunC*ndl*sh+amb*.62+bounce);
+    c+=snow*vec3(.35,.5,.9)*.05*snowAmt*(1.-ndl*sh);
+    // ice glints: tiny random facets that flash when they mirror the sun
+    vec3 cell=floor(vec3(pp.xz*120.,pp.y*120.)).xzy; float g=h21(cell.xy+cell.z*1.7);
+    vec3 hn=normalize(n+(vec3(h21(cell.xy+3.1),h21(cell.yx+8.7),h21(cell.xy+5.3))-.5)*1.4);
+    float gl=step(.93,g)*snowAmt*pow(max(dot(reflect(rd,hn),sunL),0.),70.)*sh;
+    c+=vec3(2.4,2.0,1.5)*gl*(.5+.5*sin(t*5.+g*90.))*(1.-clamp(tT*.025,0.,1.))*3.2;
+    c=mix(c,vec3(.55,.30,.18)*(.4+.6*ndl*sh)+amb*.3,exp(-pp.y*2.6)*.45);   // warm low-lying fog hugging the base
+    base=mix(c,hzc*1.05,1.-exp(-tT*.042));
+  } else if(rd.y<0.){ base=mix(vec3(.04,.05,.11),hzc*1.02,clamp(exp(rd.y*32.)*1.1,0.,1.)); }
+  // stacked cloud layers, front to back, with parallax and mountain shadows
+  float trans=1.; vec3 acc=vec3(0.);
+  if(rd.y<-.003){
+    for(int k=0;k<3;k++){
+      float yk=.34-.15*float(k), tk=(yk-ro.y)/rd.y;
+      if(tk>0.&&(tT<0.||tk<tT)){
+        vec3 q=ro+rd*tk; vec4 cl=cloudLayer(q.xz,float(k),t,sunL);
+        if(tT>0.) cl.a*=sm(0.,.28,(tT-tk)*(-rd.y));
+        if(cl.a>.02){
+          float sh=1.; if(k==0) sh=terrShadow(q,sunL);
+          cl.rgb*=mix(.45,1.,sh);
+          float fk=1.-exp(-tk*.038);
+          cl.rgb=mix(cl.rgb,hzc*1.05,fk); cl.a=mix(cl.a,1.,fk*.7);
+          acc+=trans*cl.a*cl.rgb; trans*=1.-cl.a;
+        }
+      }
+    }
+  }
+  vec3 col=acc+trans*base;
+  // a little drifting diamond dust, kept subtle; the real sparkle is on the snow
+  vec2 pS=vec2(dot(sunL,rt),dot(sunL,up))/max(dot(sunL,fw),.05)/fov;
+  float dust=0.;
+  for(int L=0;L<2;L++){
+    float fl=float(L); vec2 g2=p*(16.+fl*12.)+vec2(t*(.04+.02*fl),-t*(.03+.025*fl)), id=floor(g2), lc=fract(g2)-.5;
+    float r=h21(id+fl*9.3); lc+=(vec2(h21(id+1.7),h21(id+4.1))-.5)*.5;
+    float tw=pow(.5+.5*sin(t*(1.2+r*3.)+r*60.),5.);
+    dust+=step(.9,r)*tw*(exp(-dot(lc,lc)*(600.-fl*150.))+.2*(exp(-abs(lc.x)*55.)*exp(-abs(lc.y)*7.)+exp(-abs(lc.y)*55.)*exp(-abs(lc.x)*7.)));
+  }
+  col+=vec3(1.6,1.25,.85)*dust*.16;
+  float gd=length(p-pS);
+  col+=vec3(1.6,.9,.45)*exp(-gd*2.6)*.07+vec3(1.2,.8,.5)*exp(-abs(p.y-pS.y)*30.)*exp(-abs(p.x-pS.x)*1.4)*.05;
+  return col;
+}
+
+// ================= STILLNESS : dusk sky mirrored in water, sun glitter, layered ranges =================
+vec3 withRange(vec3 sky,vec3 d,vec3 haze){
+  float az=atan(d.x,d.z), lat=asin(clamp(d.y,-1.,1.));
+  float r1=.020+.050*(rid(vec2(az*1.7,3.))-.35);
+  float r2=.010+.034*(rid(vec2(az*3.1+9.,7.))-.30);
+  vec3 c=sky;
+  float r0=.030+.040*(rid(vec2(az*1.1+21.,5.))-.30);
+  c=mix(c,mix(vec3(.12,.11,.18),haze,.78),sm(.0016,-.0016,lat-r0));
+  c=mix(c,mix(vec3(.06,.055,.11),haze,.55),sm(.0016,-.0016,lat-r1));
+  c=mix(c,mix(vec3(.018,.02,.045),haze,.28),sm(.0016,-.0016,lat-r2));
+  return c;
+}
+vec2 waveSlope(vec2 q,float t,float dist,float nWaves){
+  vec2 s=vec2(0.);
+  for(int i=0;i<10;i++){
+    if(float(i)>=nWaves) break;
+    float fi=float(i), ang=(h11(fi*3.1+1.)-.5)*1.5, fr=.9*pow(1.52,fi);
+    vec2 k=vec2(sin(ang),cos(ang))*fr;
+    float amp=.034/pow(fr,.9)*exp(-fr*dist*.016);
+    s+=k*amp*cos(dot(k,q)+fi*2.3+t*(.45+.22*sqrt(fr)));
+  }
+  return s;
+}
+vec3 sLake(vec2 p,float t){
+  float yaw0=(${SUN.lake.u.toFixed(4)}-.5)*2.*PI-(.42-.004*t);
+  vec3 sunW=sunDir(uSunB), sunL=rotY(sunW,-yaw0);
+  vec3 ro=vec3(0.,.42+.0015*t,0.);
+  vec3 fw=normalize(vec3(0.,.06,1.)), rt=vec3(1.,0.,0.), up=cross(fw,rt);
+  float fov=1.15;
+  vec3 rd=normalize(fw+rt*p.x*fov+up*p.y*fov);
+  vec3 hz=skyL(uSkyB,rotY(normalize(vec3(rd.x,.02,rd.z)),yaw0),3.);
+  vec3 col;
+  if(rd.y>=0.){
+    vec3 wd=rotY(rd,yaw0);
+    col=withRange(skyL(uSkyB,wd,0.),wd,hz);
+    float sd=max(dot(wd,sunW),0.);
+    col+=vec3(2.2,1.4,.8)*(pow(sd,2000.)*5.+pow(sd,100.)*.06);
+  } else {
+    float dist=-ro.y/rd.y; vec2 q=ro.xz+rd.xz*dist;
+    vec2 gr=waveSlope(q,t,dist,7.);
+    vec3 n=normalize(vec3(-gr.x,1.,-gr.y));
+    vec2 c0=vec2(.15,6.5); float rr=length((q-c0)*vec2(1.,1.8)), rg=mod(max(t-4.,0.),14.);
+    float ring=sin((rr-rg*.55)*7.)*exp(-pow((rr-rg*.55)*1.3,2.))*exp(-rg*.18)*step(4.,t);
+    n=normalize(n+vec3(ring*.03,0.,ring*.03));
+    vec3 r=reflect(rd,n); r.y=abs(r.y)+.002;
+    vec3 wr=rotY(r,yaw0);
+    vec3 refl=withRange(skyL(uSkyB,wr,clamp(dist*.04,0.,2.5)),wr,hz);
+    float cs=max(dot(-rd,n),0.), F=.02+.98*pow(1.-cs,5.);
+    vec3 deep=vec3(.010,.022,.040)+hz*.04;
+    col=mix(deep,refl,clamp(F*1.12,0.,1.));
+    vec2 g2=waveSlope(q,t,dist,10.); vec3 n2=normalize(vec3(-g2.x,1.,-g2.y));
+    vec3 r2=reflect(rd,n2); r2.y=abs(r2.y)+.002;
+    float sp=pow(max(dot(r2,sunL),0.),1400.)*13.+pow(max(dot(r,sunL),0.),160.)*.22;
+    col+=vec3(1.9,1.15,.62)*sp;
+  }
+  vec2 pS=vec2(dot(sunL,rt),dot(sunL,up))/max(dot(sunL,fw),.05)/fov;
+  float gd=length(p-pS);
+  col+=vec3(1.6,.9,.45)*exp(-gd*4.5)*.05+vec3(1.2,.8,.5)*exp(-abs(p.y-pS.y)*28.)*exp(-abs(p.x-pS.x)*1.6)*.035;
+  return col;
+}
+
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }
+void main(){
+  vec2 p=(gl_FragCoord.xy-.5*uRes)/uRes.y;
+  vec3 c=vec3(0.);
+  if(uW[0]>.001) c+=uW[0]*sLake(p,uS[0]);
+  if(uW[1]>.001) c+=uW[1]*sSummit(p,uS[1]);
+  c=pow(aces(c*.85),vec3(1./2.2));
+  outc=vec4(c,1.);
+}`;
+
+const FS_BLUR = `#version 300 es
+precision highp float;
+uniform sampler2D uTex; uniform vec2 uTexel; uniform vec2 uDir; uniform float uThresh;
+out vec4 outc;
+void main(){
+  vec2 uv=gl_FragCoord.xy*uTexel; vec3 s=vec3(0.); float w[5]=float[5](.227,.194,.121,.054,.016);
+  for(int i=-4;i<=4;i++){
+    vec3 c=texture(uTex,uv+uDir*uTexel*float(i)*1.6).rgb;
+    if(uThresh>0.){ float l=max(c.r,max(c.g,c.b)); c*=smoothstep(uThresh,uThresh+.18,l); }
+    s+=c*w[abs(i)];
+  }
+  outc=vec4(s,1.);
+}`;
+
+const FS_POST = `#version 300 es
+precision highp float;
+uniform sampler2D uScene; uniform sampler2D uBloom; uniform vec2 uRes; uniform float uT; uniform float uFade; uniform float uAsp;
+out vec4 outc;
+float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes, p=(gl_FragCoord.xy-.5*uRes)/uRes.y;
+  vec3 c=texture(uScene,uv).rgb+texture(uBloom,uv).rgb*.38;
+  c*=1.-.42*pow(length(p*vec2(.85,1.05)),2.3);
+  c+=(h21(gl_FragCoord.xy+fract(uT*7.13)*311.)-.5)*.035;
+  c*=uFade;
+  float hb=min(.5,uAsp/4.4);
+  if(uAsp>1.5&&abs(p.y)>hb) c=vec3(0.);
+  outc=vec4(max(c,0.),1.);
+}`;
+
+// ============ GL setup ============
+const cv = document.getElementById('c');
+const gl = cv.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+if (!gl) { document.getElementById('nogl').hidden = false; throw new Error('no webgl2'); }
+const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); throw new Error('shader'); } return s; };
+const mk = fs => { const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); return p; };
+const pScene = mk(FS_SCENE), pBlur = mk(FS_BLUR), pPost = mk(FS_POST);
+const U = (p, n) => gl.getUniformLocation(p, n);
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const Q = +(new URLSearchParams(location.search).get('q') || 1);
+let scale = Q, W = 2, H = 2, fbo = {};
+
+function target(w, h){
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, f, w, h };
+}
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = Math.max(2, Math.floor(innerWidth * dpr * scale)); H = Math.max(2, Math.floor(innerHeight * dpr * scale));
+  cv.width = W; cv.height = H;
+  const bw = Math.max(2, W >> 2), bh = Math.max(2, H >> 2);
+  fbo = { A: target(W, H), B: target(bw, bh), C: target(bw, bh) };
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const asp = innerWidth / innerHeight, bar = asp > 1.5 ? Math.max(0, (innerHeight - innerWidth / 2.2) / 2) : 0;
+  document.getElementById('caps').style.bottom = (bar + innerHeight * .06) + 'px';
+  document.getElementById('chap').style.top = (bar + innerHeight * .05) + 'px';
+}
+function loadTex(url, unit){
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => {
+      const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im); gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      res(tx);
+    };
+    im.onerror = () => rej(new Error('failed to load ' + url)); im.src = url;
+  });
+}
+
+// ============ text ============
+const capsEl = document.getElementById('caps'), chapEl = document.getElementById('chap');
+const capNodes = CAPS.map(([t0, t1, txt]) => {
+  const d = document.createElement('div'); d.className = 'cap';
+  const lines = txt.split('|').map(l => { const s = document.createElement('span'); s.textContent = l; d.appendChild(s); return s; });
+  capsEl.appendChild(d); return { t0, t1, d, lines };
+});
+function updateText(T){
+  for (const c of capNodes){
+    const out = 1 - smoothstep(c.t1 - 1.8, c.t1, T);
+    c.d.style.opacity = (T > c.t0 - .1 && T < c.t1 + .1) ? 1 : 0;
+    c.lines.forEach((s, j) => { const a = smoothstep(c.t0 + j * .9, c.t0 + j * .9 + 2, T) * out; s.style.opacity = a; s.style.transform = `translateY(${(1 - a) * 10}px)`; s.style.filter = `blur(${(1 - a) * 6}px)`; });
+  }
+  let a = 0, label = '';
+  START.forEach((s, i) => { const v = smoothstep(s + 1, s + 2.6, T) * (1 - smoothstep(s + 5.2, s + 7, T)); if (v > a){ a = v; label = SCENE_NAMES[i]; } });
+  chapEl.textContent = label; chapEl.style.opacity = a;
+}
+
+// ============ render ============
+const wv = new Float32Array(2), sv = new Float32Array(2);
+let state = 'title', T = 0, t0 = 0, endT = LEN, begT = 0, idle = 0, frozen = false, last = performance.now(), fr = 0, acc = 0;
+function setW(T){
+  const b = smoothstep(START[1] - FADE, START[1] + FADE, T);
+  wv[0] = 1 - b; wv[1] = b; sv[0] = T - START[0]; sv[1] = T - START[1];
+}
+const fsq = () => gl.drawArrays(gl.TRIANGLES, 0, 3);
+function bindTex(unit, tex){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex); }
+function blur(src, dst, dx, dy, thresh){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.f); gl.viewport(0, 0, dst.w, dst.h); gl.useProgram(pBlur);
+  bindTex(4, src.tex); gl.uniform1i(U(pBlur, 'uTex'), 4); gl.uniform2f(U(pBlur, 'uTexel'), 1 / dst.w, 1 / dst.h);
+  gl.uniform2f(U(pBlur, 'uDir'), dx, dy); gl.uniform1f(U(pBlur, 'uThresh'), thresh); fsq();
+}
+function render(){
+  let Tn;
+  if (state === 'title'){ wv[0] = 1; wv[1] = 0; sv[0] = 6 + idle; sv[1] = 0; Tn = idle; }
+  else { setW(T); Tn = T; }
+  const fade = state === 'title' ? 1 : smoothstep(begT, begT + 2.2, T) * (1 - smoothstep(endT - 2, endT, T));
+  gl.useProgram(pScene); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.A.f); gl.viewport(0, 0, W, H);
+  gl.uniform2f(U(pScene, 'uRes'), W, H); gl.uniform1fv(U(pScene, 'uW[0]'), wv); gl.uniform1fv(U(pScene, 'uS[0]'), sv);
+  gl.uniform1i(U(pScene, 'uSkyA'), 0); gl.uniform1i(U(pScene, 'uSkyB'), 1);
+  gl.uniform2f(U(pScene, 'uSunA'), SUN.summit.u, SUN.summit.lat); gl.uniform2f(U(pScene, 'uSunB'), SUN.lake.u, SUN.lake.lat);
+  fsq();
+  blur(fbo.A, fbo.B, 1, 0, .80); blur(fbo.B, fbo.C, 0, 1, 0); blur(fbo.C, fbo.B, 2.2, 0, 0); blur(fbo.B, fbo.C, 0, 2.2, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.useProgram(pPost);
+  bindTex(5, fbo.A.tex); bindTex(6, fbo.C.tex);
+  gl.uniform1i(U(pPost, 'uScene'), 5); gl.uniform1i(U(pPost, 'uBloom'), 6);
+  gl.uniform2f(U(pPost, 'uRes'), W, H); gl.uniform1f(U(pPost, 'uT'), Tn); gl.uniform1f(U(pPost, 'uFade'), fade); gl.uniform1f(U(pPost, 'uAsp'), innerWidth / innerHeight);
+  fsq();
+  updateText(state === 'title' ? -99 : T);
+}
+function frame(now){
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (!frozen){
+    if (state === 'title') idle += dt * .6;
+    else if (state === 'play'){ T = begT + (now - t0) / 1000; if (T >= endT){ state = 'end'; document.getElementById('outro').hidden = false; } }
+    acc += dt; fr++;
+    if (fr === 45){ const ms = acc / 45 * 1000; acc = 0; fr = 0;
+      if (ms > 30 && scale > .4){ scale = Math.max(.4, scale * .82); resize(); } else if (ms < 13 && scale < Q){ scale = Math.min(Q, scale * 1.08); resize(); } }
+  }
+  render(); requestAnimationFrame(frame);
+}
+function begin(from, to){ document.getElementById('intro').hidden = true; document.getElementById('outro').hidden = true; state = 'play'; begT = from; endT = to; T = from; t0 = performance.now(); }
+let lastRange = [0, LEN];
+const go = (a, b) => () => { lastRange = [a, b]; begin(a, b); };
+document.getElementById('goBoth').onclick = go(0, LEN);
+document.getElementById('goLake').onclick = go(0, 30);
+document.getElementById('goSummit').onclick = go(START[1] - 1, LEN);
+document.getElementById('again').onclick = () => begin(...lastRange);
+window.lab = { seek(t){ frozen = true; state = 'play'; document.getElementById('intro').hidden = true; begT = 0; endT = LEN; T = t; render(); } };
+
+resize(); addEventListener('resize', resize);
+Promise.all([loadTex('assets/sky_kloppenheim.jpg', 0), loadTex('assets/sky_belfast.jpg', 1)]).then(() => {
+  // plate A (kloppenheim) is the summit sky, plate B (belfast) is the lake sky
+  ['goBoth', 'goLake', 'goSummit'].forEach(id => { document.getElementById(id).disabled = false; });
+  document.getElementById('goBoth').textContent = 'Play both';
+  const qt = new URLSearchParams(location.search).get('t'); if (qt !== null) window.lab.seek(+qt);
+  requestAnimationFrame(frame);
+}).catch(e => { console.error(e); document.getElementById('goBoth').textContent = 'Could not load images'; });
+</script>
+</body>
+</html>
