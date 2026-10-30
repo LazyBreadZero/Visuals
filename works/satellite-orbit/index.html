@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Orbital Wireframe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: full-bleed vector display. HUD readouts top-left, control terminal docked right (bottom sheet on phones).
+   Deliberately single-look: a black phosphor monitor, whatever the host theme. */
+:root{
+  --h:130; --s:100%;
+  --bg:#000;
+  --ph:hsl(var(--h) var(--s) 58%);
+  --ph-hi:hsl(var(--h) var(--s) 80%);
+  --ph-dim:hsl(var(--h) var(--s) 58% / .42);
+  --ph-faint:hsl(var(--h) var(--s) 58% / .16);
+  --display:'VT323','Courier New',monospace;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ph);overflow:hidden;font-family:var(--display);font-size:18px}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.crt{position:fixed;inset:0;pointer-events:none;z-index:2}
+.crt.on::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.32) 0 1px,transparent 1px 3px)}
+.crt::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 52%,rgba(0,0,0,.7) 100%)}
+.roll{position:fixed;left:0;right:0;height:14%;top:-20%;z-index:2;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--ph-faint),transparent);opacity:.5;animation:roll 8s linear infinite}
+.flick{animation:flick 4s steps(1) infinite}
+@keyframes roll{to{top:120%}}
+@keyframes flick{0%{opacity:1}7%{opacity:.93}8%{opacity:1}52%{opacity:.96}53%{opacity:1}91%{opacity:.92}92%{opacity:1}}
+
+.hud{position:fixed;z-index:3;left:max(16px,env(safe-area-inset-left,0px));top:max(14px,env(safe-area-inset-top,0px));pointer-events:none;text-shadow:0 0 8px var(--ph-dim)}
+.hud h1{font:400 28px/1 var(--display);margin:0;letter-spacing:.06em;color:var(--ph-hi)}
+.hud .sub{font:400 15px/1.3 var(--mono);color:var(--ph-dim);letter-spacing:.08em;margin:6px 0 12px;text-transform:uppercase}
+.hud dl{margin:0;display:grid;grid-template-columns:auto auto;gap:1px 16px;font-size:20px;line-height:1.1}
+.hud dt{color:var(--ph-dim);letter-spacing:.08em}
+.hud dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.hint{position:fixed;z-index:3;left:max(16px,env(safe-area-inset-left,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));color:var(--ph-dim);font:400 14px var(--mono);letter-spacing:.06em;pointer-events:none}
+
+.panel{position:fixed;z-index:4;right:max(16px,env(safe-area-inset-right,0px));top:max(14px,env(safe-area-inset-top,0px));width:304px;max-height:calc(100% - 28px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;background:rgba(0,0,0,.84);border:1px solid var(--ph-dim);box-shadow:0 0 24px var(--ph-faint)}
+.bar{display:flex;align-items:center;justify-content:space-between;background:var(--ph);color:#000;padding:2px 6px 2px 10px;font-size:20px;letter-spacing:.08em;user-select:none}
+.bar button{all:unset;cursor:pointer;padding:0 8px;font:inherit}
+.bar button:focus-visible{outline:2px solid #000;outline-offset:-2px}
+.body{overflow:auto;padding:4px 12px 12px;scrollbar-width:thin;scrollbar-color:var(--ph-dim) transparent}
+.panel.collapsed .body{display:none}
+.sec{font-size:18px;letter-spacing:.14em;color:var(--ph-hi);margin:12px 0 4px;border-bottom:1px dashed var(--ph-dim);padding-bottom:2px}
+.row{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;letter-spacing:.06em}
+.row output{color:var(--ph-hi);font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--ph-dim)}
+input[type=range]::-moz-range-track{height:1px;background:var(--ph-dim)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:14px;margin-top:-7px;background:var(--ph);border:0;border-radius:0;box-shadow:0 0 8px var(--ph)}
+input[type=range]::-moz-range-thumb{width:10px;height:14px;background:var(--ph);border:0;border-radius:0;box-shadow:0 0 8px var(--ph)}
+input:focus-visible,button:focus-visible{outline:1px solid var(--ph-hi);outline-offset:2px}
+.togs{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;margin-top:6px}
+.tog{display:flex;gap:6px;cursor:pointer;letter-spacing:.06em;align-items:center}
+.tog input{appearance:none;-webkit-appearance:none;margin:0;width:auto;cursor:pointer}
+.tog input::before{content:"[ ]";color:var(--ph-dim)}
+.tog input:checked::before{content:"[X]";color:var(--ph-hi);text-shadow:0 0 8px var(--ph)}
+.sws{display:flex;gap:6px;margin:6px 0 2px;flex-wrap:wrap}
+.sw{all:unset;cursor:pointer;width:44px;height:22px;border:1px solid var(--ph-dim);font-size:14px;line-height:20px;text-align:center;color:#000;letter-spacing:.04em}
+.sw:hover,.sw.on{outline:1px solid var(--ph-hi);outline-offset:1px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.btn{all:unset;cursor:pointer;text-align:center;border:1px solid var(--ph);padding:3px 0;letter-spacing:.1em;box-sizing:border-box}
+.btn:hover{background:var(--ph);color:#000}
+.btn:focus-visible{outline:1px solid var(--ph-hi);outline-offset:2px}
+#cfg{display:none;width:100%;height:84px;margin-top:8px;background:#000;color:var(--ph);border:1px solid var(--ph-dim);font:12px var(--mono);resize:none}
+#cfg.show{display:block}
+@media (max-width:700px){
+  .hud h1{font-size:22px}.hud dl{font-size:17px}
+  .hint{display:none}
+  .panel{left:max(0px,env(safe-area-inset-left,0px));right:max(0px,env(safe-area-inset-right,0px));top:auto;bottom:0;width:auto;max-height:52%;padding-bottom:env(safe-area-inset-bottom,0px)}
+}
+@media (prefers-reduced-motion:reduce){.roll,.flick{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Wireframe satellite orbiting a wireframe Earth"></canvas>
+<div class="crt on" id="crt"></div><div class="roll"></div>
+
+<section class="hud" aria-label="Tracking readout">
+  <h1>VIS-01 // ORBITAL TRACK</h1>
+  <div class="sub" id="orbclass">LOW EARTH ORBIT</div>
+  <dl>
+    <dt>T+</dt><dd id="r_t">00:00:00</dd>
+    <dt>ALT</dt><dd id="r_alt">0 KM</dd>
+    <dt>VEL</dt><dd id="r_vel">0.00 KM/S</dd>
+    <dt>PERIOD</dt><dd id="r_per">0.0 MIN</dd>
+    <dt>LAT</dt><dd id="r_lat">0.0°N</dd>
+    <dt>LON</dt><dd id="r_lon">0.0°E</dd>
+  </dl>
+</section>
+<div class="hint">DRAG ROTATE · SCROLL ZOOM · SPACE PAUSE · H HIDE PANEL</div>
+
+<aside class="panel" id="panel" aria-label="Controls">
+  <div class="bar"><span>ORBITAL.EXE</span><button id="fold" aria-label="Collapse controls" aria-expanded="true">[–]</button></div>
+  <div class="body" id="ctrls"></div>
+</aside>
+
+<script>
+// ---------- config (tweak defaults here) ----------
+const DEFAULTS = {
+  orbitSpeed:1, earthSpin:.5, tumble:.3, drift:.08,
+  alt:1.55, inc:52, trail:.4,
+  mesh:15, glow:1.3, weight:1.2, persist:.35, satSize:2.1, zoom:4.8,
+  hue:130, sat:100,
+  continents:true, ring:true, showTrail:true, beam:true, labels:true, stars:true, scan:true, flicker:true,
+  paused:false
+};
+const PRESETS = [
+  {n:'GRN',h:130,s:100},{n:'AMB',h:40,s:100},{n:'ICE',h:186,s:100},{n:'RED',h:2,s:100},{n:'MONO',h:0,s:0}
+];
+const CTRL = [
+  {sec:'MOTION'},
+  {k:'orbitSpeed',l:'ORBIT SPEED',min:-3,max:3,step:.05,f:v=>v.toFixed(2)+'×'},
+  {k:'earthSpin',l:'EARTH SPIN',min:-3,max:3,step:.05,f:v=>v.toFixed(2)+'×'},
+  {k:'tumble',l:'SAT TUMBLE',min:0,max:4,step:.05,f:v=>v.toFixed(2)+'×'},
+  {k:'drift',l:'CAMERA DRIFT',min:-1,max:1,step:.02,f:v=>v.toFixed(2)},
+  {sec:'ORBIT'},
+  {k:'alt',l:'ALTITUDE',min:1.15,max:3,step:.01,f:v=>Math.round((v-1)*6371).toLocaleString('en-US')+' KM'},
+  {k:'inc',l:'INCLINATION',min:0,max:90,step:1,f:v=>v+'°'},
+  {k:'trail',l:'TRAIL LENGTH',min:0,max:1,step:.01,f:v=>Math.round(v*100)+'%'},
+  {sec:'DISPLAY'},
+  {k:'mesh',l:'MESH DENSITY',min:6,max:30,step:1,f:v=>v+' LINES'},
+  {k:'glow',l:'PHOSPHOR GLOW',min:0,max:3,step:.05,f:v=>v.toFixed(2)},
+  {k:'weight',l:'LINE WEIGHT',min:.5,max:3,step:.05,f:v=>v.toFixed(2)},
+  {k:'persist',l:'GHOSTING',min:0,max:.9,step:.01,f:v=>Math.round(v*100)+'%'},
+  {k:'satSize',l:'SATELLITE SIZE',min:.5,max:2.6,step:.05,f:v=>v.toFixed(2)+'×'},
+  {k:'zoom',l:'CAMERA DISTANCE',min:2.4,max:9,step:.05,f:v=>v.toFixed(1)},
+  {sec:'COLOUR'},
+  {presets:true},
+  {k:'hue',l:'HUE',min:0,max:360,step:1,f:v=>v+'°'},
+  {sec:'LAYERS'},
+  {toggles:[['continents','CONTINENTS'],['ring','ORBIT RING'],['showTrail','TRAIL'],['beam','NADIR BEAM'],['labels','LABELS'],['stars','STARFIELD'],['scan','SCANLINES'],['flicker','FLICKER']]}
+];
+
+// ---------- state ----------
+const S = Object.assign({}, DEFAULTS);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduce) { S.paused = true; S.flicker = false; S.drift = 0; }
+const seed = +(new URLSearchParams(location.search).get('seed') || 7);
+function rng(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rand = rng(seed);
+
+let yaw = -0.5, pitch = 0.42;        // camera
+let tOrbit = -0.7, earthRot = 0.6, tumbleT = 0, clock = 0;
+
+// ---------- continents (coarse, stylised [lon, lat]) ----------
+const LAND = [
+ [[-168,66],[-160,70],[-140,70],[-125,70],[-95,72],[-82,68],[-65,60],[-55,52],[-66,45],[-70,42],[-76,35],[-81,31],[-80,25],[-84,30],[-90,29],[-97,26],[-97,20],[-90,21],[-87,21],[-83,10],[-78,8],[-80,8],[-86,12],[-92,15],[-105,20],[-110,24],[-115,30],[-118,34],[-124,40],[-124,48],[-135,58],[-150,60],[-165,60]],
+ [[-78,8],[-72,12],[-62,10],[-50,0],[-35,-6],[-39,-15],[-48,-26],[-58,-35],[-65,-42],[-68,-52],[-72,-53],[-75,-45],[-71,-30],[-70,-18],[-76,-14],[-81,-5],[-80,0]],
+ [[-17,21],[-16,28],[-10,30],[-6,35.8],[0,35.5],[10,37],[11,33],[20,32],[25,32],[32,31],[34,28],[38,21],[43,12],[51,12],[50,8],[42,-1],[40,-10],[40,-15],[35,-22],[32,-28],[27,-34],[20,-35],[17,-30],[12,-17],[13,-8],[9,-1],[9,4],[5,6],[-4,5],[-8,4.5],[-13,8],[-17,14]],
+ [[-9,37],[-9,43],[-2,44],[-4,48],[2,51],[8,54],[10,58],[5,62],[15,69],[30,71],[60,69],[80,73],[110,77],[140,72],[170,70],[180,66],[160,60],[155,52],[142,52],[135,44],[128,40],[122,40],[122,31],[120,23],[108,21],[106,10],[100,14],[103,2],[98,8],[92,22],[80,15],[77,8],[72,20],[67,25],[57,25],[57,17],[52,15],[43,13],[35,30],[36,36],[28,36],[26,40],[23,37],[20,40],[13,45],[18,40],[16,38],[12,42],[8,44],[3,43],[-1,37]],
+ [[114,-22],[122,-18],[131,-12],[137,-12],[142,-11],[146,-19],[153,-26],[150,-37],[140,-38],[131,-31],[115,-34]],
+ [[-5,50],[1,51],[2,53],[-2,56],[-3,58.5],[-6,58],[-5,54],[-3,53]],
+ [[130,31],[135,34],[140,36],[142,40],[140,42],[144,44],[141,45],[139,38],[135,35.5],[130,33]],
+ [[44,-25],[47,-25],[50,-15],[49,-12],[44,-17]],
+ [[109,1],[117,7],[119,1],[116,-4],[110,-3]],
+ [[95,5],[98,4],[106,-3],[106,-6],[101,-3]],
+ [[-73,78],[-55,82],[-25,82],[-20,72],[-43,60],[-52,66],[-58,75]],
+ [[-180,-72],[-120,-74],[-60,-72],[0,-70],[60,-68],[120,-66],[180,-72]]
+];
+
+// ---------- geometry helpers ----------
+const D2R = Math.PI / 180;
+const sph = (lat, lon, r = 1) => { const p = lat * D2R, l = lon * D2R, c = Math.cos(p); return [r * c * Math.sin(l), r * Math.sin(p), r * c * Math.cos(l)]; };
+const rotY = (p, a) => { const c = Math.cos(a), s = Math.sin(a); return [p[0]*c + p[2]*s, p[1], -p[0]*s + p[2]*c]; };
+const rotX = (p, a) => { const c = Math.cos(a), s = Math.sin(a); return [p[0], p[1]*c - p[2]*s, p[1]*s + p[2]*c]; };
+const rotZ = (p, a) => { const c = Math.cos(a), s = Math.sin(a); return [p[0]*c - p[1]*s, p[0]*s + p[1]*c, p[2]]; };
+const TILT = 23.4 * D2R;
+
+let earthLines = [], landLines = [];
+function buildEarth(){
+  earthLines = [];
+  const n = S.mesh;
+  for (let i = 1; i < n; i++){                       // parallels
+    const lat = -90 + 180 * i / n, pts = [];
+    for (let k = 0; k <= 72; k++) pts.push(sph(lat, k * 5));
+    earthLines.push(pts);
+  }
+  for (let j = 0; j < n * 2; j++){                   // meridians
+    const lon = 360 * j / (n * 2), pts = [];
+    for (let k = 0; k <= 36; k++) pts.push(sph(-90 + k * 5, lon));
+    earthLines.push(pts);
+  }
+  landLines = LAND.map(poly => {
+    const pts = [];
+    for (let i = 0; i < poly.length; i++){
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const steps = Math.max(1, Math.ceil(Math.hypot(b[0]-a[0], b[1]-a[1]) / 4));
+      for (let s = 0; s < steps; s++) pts.push(sph(a[1] + (b[1]-a[1]) * s / steps, a[0] + (b[0]-a[0]) * s / steps, 1.004));
+    }
+    pts.push(pts[0]);
+    return pts;
+  });
+}
+
+// satellite wireframe in local units: x = along solar array, y = up (away from Earth), z = direction of travel
+const SAT = (() => {
+  const L = [];
+  const box = (hx, hy, hz) => {
+    const c = [];
+    for (const x of [-hx, hx]) for (const y of [-hy, hy]) for (const z of [-hz, hz]) c.push([x, y, z]);
+    const e = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+    e.forEach(([a, b]) => L.push([c[a], c[b]]));
+  };
+  box(.5, .5, .72);
+  L.push([[-.5,0,-.72],[.5,0,-.72],[.5,0,.72],[-.5,0,.72],[-.5,0,-.72]]);     // mid band
+  L.push([[-.5,.5,0],[.5,.5,0]], [[0,.5,-.72],[0,.5,.72]]);                   // roof cross
+  for (const sgn of [-1, 1]){                                                 // solar arrays
+    L.push([[sgn*.5,0,0],[sgn*.95,0,0]]);
+    for (let s = 0; s < 3; s++){
+      const x0 = sgn * (.95 + s * .82), x1 = sgn * (.95 + s * .82 + .74);
+      L.push([[x0,0,-.8],[x1,0,-.8],[x1,0,.8],[x0,0,.8],[x0,0,-.8]]);
+      L.push([[x0,0,-.27],[x1,0,-.27]], [[x0,0,.27],[x1,0,.27]]);
+      L.push([[(x0+x1)/2,0,-.8],[(x0+x1)/2,0,.8]]);
+    }
+  }
+  const dish = r => -1.0 - (r / .6) ** 2 * .34;                               // dish bowl opens toward Earth (-y)
+  L.push([[0,-.5,0],[0,-1,0]]);
+  for (const r of [.2, .4, .6]){
+    const ring = [];
+    for (let k = 0; k <= 24; k++){ const a = k / 24 * Math.PI * 2; ring.push([r * Math.cos(a), dish(r), r * Math.sin(a)]); }
+    L.push(ring);
+  }
+  for (let k = 0; k < 8; k++){
+    const a = k / 8 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+    L.push([[0,-1,0],[.3*c,dish(.3),.3*s],[.6*c,dish(.6),.6*s]]);
+  }
+  L.push([[0,-1,0],[0,-1.75,0]], [[-.1,-1.75,0],[.1,-1.75,0]], [[0,-1.75,-.1],[0,-1.75,.1]]);   // feed horn
+  L.push([[.22,.5,.22],[.22,1.6,.22]], [[.1,1.6,.22],[.34,1.6,.22]], [[-.25,.5,-.25],[-.25,1.05,-.25]]); // antennas
+  const n1 = [], n2 = [];
+  for (let k = 0; k <= 12; k++){ const a = k / 12 * Math.PI * 2; n1.push([.26*Math.cos(a), .26*Math.sin(a), -.72]); n2.push([.4*Math.cos(a), .4*Math.sin(a), -1.05]); }
+  L.push(n1, n2);
+  for (let k = 0; k < 4; k++){ const i = k * 3; L.push([n1[i], n2[i]]); }                      // thruster nozzle
+  return L;
+})();
+
+// ---------- canvas + projection ----------
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let W, H, dpr, cx, cy, f, D;
+const panel = document.getElementById('panel');
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.width = Math.round(innerWidth * dpr); H = cv.height = Math.round(innerHeight * dpr);
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+}
+addEventListener('resize', resize); resize();
+
+let cyaw, syaw, cp, sp;
+function view(p){
+  const x1 = p[0]*cyaw + p[2]*syaw, z1 = -p[0]*syaw + p[2]*cyaw;
+  return [x1, p[1]*cp - z1*sp, p[1]*sp + z1*cp + D];
+}
+const BACK = .17;
+const depthA = z => 1 - .5 * Math.min(1, Math.max(0, (z - (D - 2)) / 4));
+function occluded(m){
+  const len = Math.hypot(m[0], m[1], m[2]), t = D * m[2] / len, d2 = D*D - t*t;
+  return d2 < 1 && (t - Math.sqrt(1 - d2)) < len;
+}
+
+// ---------- batched line drawing: Path2D per (group, brightness level) ----------
+const LEVELS = 8;
+const GROUPS = { ring:{l:52,w:.8,a:.8}, trail:{l:68,w:1.5,a:1}, earth:{l:58,w:1,a:1}, beam:{l:70,w:.8,a:.9}, sat:{l:90,w:1.9,a:1} };
+let paths;
+function resetPaths(){ paths = {}; for (const k in GROUPS) paths[k] = new Array(LEVELS + 1).fill(null); }
+function seg(grp, a, b, mul, surface){
+  if (a[2] < .3 || b[2] < .3) return;
+  const m = [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2];
+  let al;
+  if (surface){ al = (m[0]*m[0] + m[1]*m[1] + m[2]*(m[2]-D)) < 0 ? depthA(m[2]) : BACK; }
+  else al = occluded(m) ? BACK : depthA(m[2]);
+  const lv = Math.round(al * mul * LEVELS);
+  if (lv < 1) return;
+  const P = paths[grp][lv] || (paths[grp][lv] = new Path2D());
+  P.moveTo(cx + f * a[0] / a[2], cy - f * a[1] / a[2]);
+  P.lineTo(cx + f * b[0] / b[2], cy - f * b[1] / b[2]);
+}
+function poly(grp, pts, mul = 1, surface = false, dash = 0, phase = 0){
+  for (let i = 0; i < pts.length - 1; i++){
+    if (dash && ((i + phase) % dash) >= dash / 2) continue;
+    seg(grp, pts[i], pts[i + 1], mul, surface);
+  }
+}
+const proj = v => [cx + f * v[0] / v[2], cy - f * v[1] / v[2]];
+
+// ---------- stars (screen-space, parallax by camera yaw) ----------
+const stars = Array.from({ length: 120 }, () => ({ u: rand(), v: rand(), l: 1 + Math.floor(rand() * 3), p: rand() * 6.28 }));
+
+// ---------- orbit maths ----------
+const orbitBasis = () => { const i = S.inc * D2R; return { u: [1, 0, 0], v: [0, Math.sin(i), Math.cos(i)] }; };
+const orbitPos = (a, r, B) => [r*(Math.cos(a)*B.u[0] + Math.sin(a)*B.v[0]), r*(Math.cos(a)*B.u[1] + Math.sin(a)*B.v[1]), r*(Math.cos(a)*B.u[2] + Math.sin(a)*B.v[2])];
+const earthToWorld = p => rotZ(rotY(p, earthRot), TILT);
+
+// ---------- frame ----------
+const hsla = (l, a) => `hsla(${S.hue},${S.sat}%,${l}%,${a})`;
+let sceneInfo = { lat: 0, lon: 0 };
+function draw(){
+  cyaw = Math.cos(yaw); syaw = Math.sin(yaw); cp = Math.cos(pitch); sp = Math.sin(pitch);
+  D = S.zoom; f = Math.min(W, H) * 1.2;
+  cx = W / 2 - (innerWidth > 900 && !panel.classList.contains('collapsed') ? 150 * dpr : 0);
+  cy = H / 2 - (innerWidth <= 700 && !panel.classList.contains('collapsed') ? H * .12 : 0);
+
+  g.globalCompositeOperation = 'source-over'; g.shadowBlur = 0;
+  g.fillStyle = `rgba(0,0,0,${1 - S.persist})`; g.fillRect(0, 0, W, H);
+
+  if (S.stars){                                      // starfield
+    for (const s of stars){
+      const x = (((s.u + yaw * .015 * s.l) % 1) + 1) % 1 * W, y = (((s.v + pitch * .01 * s.l) % 1) + 1) % 1 * H;
+      g.fillStyle = hsla(70, (.25 + .2 * Math.sin(clock * s.l * .8 + s.p)) * (.5 + s.l * .2));
+      g.fillRect(x, y, s.l > 2 ? 2 * dpr : dpr, s.l > 2 ? 2 * dpr : dpr);
+    }
+  }
+
+  resetPaths();
+  // Earth
+  const cs = Math.cos(earthRot), sn = Math.sin(earthRot), ct = Math.cos(TILT), st = Math.sin(TILT);
+  const earthV = u => {                              // local unit/surface point -> view space
+    const x = u[0]*cs + u[2]*sn, z = -u[0]*sn + u[2]*cs, y = u[1];
+    return view([x*ct - y*st, x*st + y*ct, z]);
+  };
+  for (const ln of earthLines) poly('earth', ln.map(earthV), 1, true);
+  if (S.continents) for (const ln of landLines) poly('earth', ln.map(earthV), 1, true);
+
+  // orbit
+  const r = S.alt, B = orbitBasis();
+  if (S.ring){
+    const pts = []; for (let k = 0; k <= 180; k++) pts.push(view(orbitPos(k / 180 * Math.PI * 2, r, B)));
+    poly('ring', pts, .8, false, 4, Math.floor(clock * 8));
+  }
+  const a = tOrbit, P = orbitPos(a, r, B);
+  if (S.showTrail && S.trail > 0){
+    const len = S.trail * Math.PI * 1.6, N = 70;
+    for (let k = 0; k < N; k++){
+      const a0 = a - len * k / N, a1 = a - len * (k + 1) / N;
+      seg('trail', view(orbitPos(a0, r, B)), view(orbitPos(a1, r, B)), 1 - k / N, false);
+    }
+  }
+  // satellite basis: side (orbit normal), up (radial), travel (tangent)
+  const rad = [P[0]/r, P[1]/r, P[2]/r];
+  const tan = [-Math.sin(a)*B.u[0] + Math.cos(a)*B.v[0], -Math.sin(a)*B.u[1] + Math.cos(a)*B.v[1], -Math.sin(a)*B.u[2] + Math.cos(a)*B.v[2]];
+  const side = [B.u[1]*B.v[2] - B.u[2]*B.v[1], B.u[2]*B.v[0] - B.u[0]*B.v[2], B.u[0]*B.v[1] - B.u[1]*B.v[0]];
+  const k = .11 * S.satSize;
+  const place = p => {
+    let q = rotZ(rotX(rotY(p, tumbleT * .9), tumbleT * .6), tumbleT * .4);
+    return view([P[0] + k*(q[0]*side[0] + q[1]*rad[0] + q[2]*tan[0]), P[1] + k*(q[0]*side[1] + q[1]*rad[1] + q[2]*tan[1]), P[2] + k*(q[0]*side[2] + q[1]*rad[2] + q[2]*tan[2])]);
+  };
+  for (const ln of SAT) poly('sat', ln.map(place), 1, false);
+  if (S.beam){
+    const bp = [], N = 14;
+    for (let i = 0; i <= N; i++){ const s = 1 - (1 - 1 / r) * i / N; bp.push(view([P[0]*s, P[1]*s, P[2]*s])); }
+    poly('beam', bp, 1, false, 2, 0);
+    const mk = []; for (let i = 0; i <= 16; i++){ const t = i / 16 * Math.PI * 2, q = .05; const s = 1.004 / r; mk.push(view([P[0]*s + q*(Math.cos(t)*side[0] + Math.sin(t)*tan[0]), P[1]*s + q*(Math.cos(t)*side[1] + Math.sin(t)*tan[1]), P[2]*s + q*(Math.cos(t)*side[2] + Math.sin(t)*tan[2])])); }
+    poly('sat', mk, 1, true);
+  }
+
+  // stroke batches
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.shadowColor = hsla(55, .9); g.shadowBlur = S.glow * 9 * dpr;
+  for (const grp of ['ring', 'trail', 'earth', 'beam', 'sat']){
+    const G = GROUPS[grp]; g.lineWidth = S.weight * G.w * dpr;
+    for (let lv = 1; lv <= LEVELS; lv++){
+      const Pth = paths[grp][lv]; if (!Pth) continue;
+      g.strokeStyle = hsla(G.l, (lv / LEVELS) * G.a); g.stroke(Pth);
+    }
+  }
+  // Earth limb
+  const c0 = proj([0, 0, D]), R = f / Math.sqrt(D*D - 1);
+  g.lineWidth = S.weight * 1.2 * dpr; g.strokeStyle = hsla(62, .9);
+  g.beginPath(); g.arc(c0[0], c0[1], R, 0, Math.PI * 2); g.stroke();
+
+  if (S.labels){
+    const sp0 = proj(view(P)), occ = occluded(view(P)), al = occ ? .3 : .95;
+    g.shadowBlur = S.glow * 5 * dpr; g.fillStyle = hsla(80, al); g.strokeStyle = hsla(70, al * .7);
+    g.lineWidth = dpr; g.beginPath(); g.moveTo(sp0[0] + 16*dpr, sp0[1] - 14*dpr); g.lineTo(sp0[0] + 34*dpr, sp0[1] - 30*dpr); g.lineTo(sp0[0] + 80*dpr, sp0[1] - 30*dpr); g.stroke();
+    g.font = `${17*dpr}px VT323, monospace`; g.fillText('VIS-01', sp0[0] + 38*dpr, sp0[1] - 34*dpr);
+    g.font = `${13*dpr}px VT323, monospace`; g.fillStyle = hsla(65, al * .8);
+    g.fillText(Math.round((r - 1) * 6371).toLocaleString('en-US') + ' KM', sp0[0] + 38*dpr, sp0[1] - 20*dpr);
+    g.shadowBlur = 0;
+  }
+  // sub-satellite point for HUD
+  const q = rotY(rotZ(P, -TILT), -earthRot);
+  sceneInfo.lat = Math.asin(q[1] / r) / D2R; sceneInfo.lon = Math.atan2(q[0], q[2]) / D2R;
+}
+
+// ---------- HUD ----------
+const el = id => document.getElementById(id);
+let lastHud = 0;
+function hud(now){
+  if (now - lastHud < 100) return; lastHud = now;
+  const rKm = S.alt * 6371, v = Math.sqrt(398600 / rKm), per = 2 * Math.PI * Math.sqrt(rKm ** 3 / 398600) / 60;
+  const t = Math.floor(clock), pad = n => String(n).padStart(2, '0');
+  el('r_t').textContent = `${pad(Math.floor(t / 3600))}:${pad(Math.floor(t / 60) % 60)}:${pad(t % 60)}`;
+  el('r_alt').textContent = Math.round((S.alt - 1) * 6371).toLocaleString('en-US') + ' KM';
+  el('r_vel').textContent = v.toFixed(2) + ' KM/S';
+  el('r_per').textContent = per.toFixed(1) + ' MIN';
+  el('r_lat').textContent = Math.abs(sceneInfo.lat).toFixed(1) + '°' + (sceneInfo.lat >= 0 ? 'N' : 'S');
+  el('r_lon').textContent = Math.abs(sceneInfo.lon).toFixed(1) + '°' + (sceneInfo.lon >= 0 ? 'E' : 'W');
+  const alt = (S.alt - 1) * 6371;
+  el('orbclass').textContent = alt < 2000 ? 'LOW EARTH ORBIT' : alt < 35786 ? 'MEDIUM EARTH ORBIT' : 'GEOSTATIONARY';
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!S.paused){
+    clock += dt;
+    tOrbit += dt * S.orbitSpeed * .67 * Math.pow(S.alt, -1.5);   // Kepler-ish: higher orbits move slower
+    earthRot += dt * S.earthSpin * .3;
+    tumbleT += dt * S.tumble;
+    if (!dragging) yaw += dt * S.drift;
+  }
+  draw(); hud(now);
+  requestAnimationFrame(frame);
+}
+
+// ---------- controls ----------
+const host = el('ctrls');
+(function buildUI(){
+  let h = '';
+  for (const c of CTRL){
+    if (c.sec) h += `<div class="sec">// ${c.sec}</div>`;
+    else if (c.presets) h += '<div class="sws">' + PRESETS.map((p, i) => `<button class="sw" data-i="${i}" style="background:hsl(${p.h} ${p.s}% 58%)">${p.n}</button>`).join('') + '</div>';
+    else if (c.toggles) h += '<div class="togs">' + c.toggles.map(([k, l]) => `<label class="tog"><input type="checkbox" id="t_${k}" data-k="${k}"><span>${l}</span></label>`).join('') + '</div>';
+    else h += `<label class="row" for="s_${c.k}"><span>${c.l}</span><output id="o_${c.k}"></output></label><input type="range" id="s_${c.k}" data-k="${c.k}" min="${c.min}" max="${c.max}" step="${c.step}">`;
+  }
+  h += `<div class="btns"><button class="btn" id="b_pause"></button><button class="btn" id="b_scr">SCRAMBLE</button><button class="btn" id="b_rst">RESET</button><button class="btn" id="b_cfg">COPY SETTINGS</button></div><textarea id="cfg" readonly aria-label="Settings JSON"></textarea>`;
+  host.innerHTML = h;
+})();
+
+function applyColour(){
+  const r = document.documentElement.style;
+  r.setProperty('--h', S.hue); r.setProperty('--s', S.sat + '%');
+  host.querySelectorAll('.sw').forEach(b => { const p = PRESETS[+b.dataset.i]; b.classList.toggle('on', p.h === S.hue && p.s === S.sat); });
+}
+function applyLayers(){
+  el('crt').classList.toggle('on', S.scan);
+  cv.classList.toggle('flick', S.flicker);
+}
+function sync(){
+  for (const c of CTRL){
+    if (!c.k) continue;
+    el('s_' + c.k).value = S[c.k]; el('o_' + c.k).textContent = c.f(+S[c.k]);
+  }
+  host.querySelectorAll('[data-k][type=checkbox]').forEach(i => i.checked = !!S[i.dataset.k]);
+  el('b_pause').textContent = S.paused ? 'RESUME' : 'PAUSE';
+  applyColour(); applyLayers();
+}
+host.addEventListener('input', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  if (e.target.type === 'checkbox') S[k] = e.target.checked; else S[k] = +e.target.value;
+  if (k === 'mesh') buildEarth();
+  if (k === 'hue') S.sat = S.sat === 0 ? 100 : S.sat;
+  if (e.target.type !== 'checkbox'){ const c = CTRL.find(c => c.k === k); el('o_' + k).textContent = c.f(S[k]); }
+  applyColour(); applyLayers();
+});
+host.addEventListener('click', e => {
+  const sw = e.target.closest('.sw'); if (sw){ const p = PRESETS[+sw.dataset.i]; S.hue = p.h; S.sat = p.s; sync(); return; }
+  const id = e.target.id;
+  if (id === 'b_pause') togglePause();
+  if (id === 'b_scr') scramble();
+  if (id === 'b_rst'){ Object.assign(S, DEFAULTS); if (reduce) S.paused = true; yaw = -0.5; pitch = .42; buildEarth(); sync(); }
+  if (id === 'b_cfg'){
+    const txt = JSON.stringify(S), ta = el('cfg'); ta.value = txt;
+    const done = () => { e.target.textContent = 'COPIED'; setTimeout(() => e.target.textContent = 'COPY SETTINGS', 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => { ta.classList.add('show'); ta.select(); });
+    else { ta.classList.add('show'); ta.select(); }
+  }
+});
+function togglePause(){ S.paused = !S.paused; el('b_pause').textContent = S.paused ? 'RESUME' : 'PAUSE'; }
+function scramble(){
+  const R = (a, b) => a + rand() * (b - a), p = PRESETS[Math.floor(rand() * PRESETS.length)];
+  Object.assign(S, { orbitSpeed:+(R(.4, 2.4) * (rand() < .15 ? -1 : 1)).toFixed(2), earthSpin:+R(-1.5, 1.5).toFixed(2), tumble:+R(0, 2.5).toFixed(2),
+    alt:+R(1.25, 2.6).toFixed(2), inc:Math.round(R(0, 90)), mesh:Math.round(R(8, 26)), trail:+R(.1, .9).toFixed(2), glow:+R(.6, 2.4).toFixed(2), hue:p.h, sat:p.s });
+  buildEarth(); sync();
+}
+el('fold').addEventListener('click', () => {
+  const c = panel.classList.toggle('collapsed');
+  el('fold').textContent = c ? '[+]' : '[–]'; el('fold').setAttribute('aria-expanded', String(!c));
+});
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'range' && e.code === 'Space') return;
+  if (e.code === 'Space'){ e.preventDefault(); togglePause(); }
+  if (e.key === 'h' || e.key === 'H') el('fold').click();
+});
+
+// camera: drag to orbit, wheel / pinch to zoom
+let dragging = false; const ptrs = new Map(); let pinch = 0;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, e); dragging = ptrs.size === 1; });
+cv.addEventListener('pointermove', e => {
+  const prev = ptrs.get(e.pointerId); if (!prev) return;
+  if (ptrs.size === 1){ yaw += (e.clientX - prev.clientX) * .006; pitch = Math.max(-1.45, Math.min(1.45, pitch + (e.clientY - prev.clientY) * .006)); }
+  ptrs.set(e.pointerId, e);
+  if (ptrs.size === 2){ const [a, b] = [...ptrs.values()], d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); if (pinch) setZoom(S.zoom * pinch / d); pinch = d; }
+});
+const up = e => { ptrs.delete(e.pointerId); dragging = false; pinch = 0; };
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(S.zoom * Math.exp(e.deltaY * .001)); }, { passive: false });
+function setZoom(z){ S.zoom = Math.max(2.4, Math.min(9, z)); el('s_zoom').value = S.zoom; el('o_zoom').textContent = S.zoom.toFixed(1); }
+
+if (innerWidth <= 700){ panel.classList.add('collapsed'); el('fold').textContent = '[+]'; el('fold').setAttribute('aria-expanded', 'false'); }
+buildEarth(); sync();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

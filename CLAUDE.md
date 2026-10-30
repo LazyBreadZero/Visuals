@@ -28,5 +28,12 @@ This repo is a studio for visuals made *with code*: HTML/CSS/JS, Canvas, SVG, We
 ## Skills available in this environment (use when relevant)
 `algorithmic-art` (p5.js, seeded, parameter UI), `canvas-design` (static PNG/PDF art), `frontend-design`/`artifact-design` (anti-generic UI), `artifact-diagramming`, `dataviz`. The Artifact tool can publish a page to a private claude.ai link for easy sharing.
 
-## Git
-Work on a feature branch, commit per finished piece, push, open a draft PR. `main` stays clean.
+## Git (owner has delegated ALL of this; never ask them to do git steps)
+- The owner is not technical with GitHub and wants zero friction. Claude handles branches, commits, pushes, PRs and merging without asking.
+- Per finished piece or meaningful change: branch `work/<slug>`, commit, push, open PR, then **squash-merge it to `main` yourself** (`gh api -X PUT repos/LazyBreadZero/Visuals/pulls/<n>/merge -f merge_method=squash`; GraphQL is blocked, use REST). Keep `main` always working.
+- Start of every session: `git pull origin main`, then read `docs/log.md` and the relevant `works/*/notes.md`. End of every session: append a short entry to `docs/log.md`.
+- Never commit secrets. Keep `.scratch/` out of git.
+- Tell the owner in plain language what you did, not git jargon.
+
+## Showing work to the owner
+After finishing a piece, publish it with the Artifact tool (strip the `<!doctype>/<html>/<head>/<body>` wrapper tags from a copy; keep `<title>`, fonts link, `<style>`, content, scripts) so they get a link they can open and share. Keep the repo file as the source of truth.

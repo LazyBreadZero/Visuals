@@ -1,0 +1,6 @@
+{
+  "title": "Orbital Wireframe",
+  "tags": ["canvas", "wireframe", "retro", "sci-fi", "interactive"],
+  "model": "Claude Sonnet 5.5",
+  "prompt": "Retro early-internet / space sci-fi vibe. Green wiremesh satellite orbiting Earth, minimal green lines on black. Bonus: interactive sliders/buttons (orbit speed, colours, anything cool)."
+}
