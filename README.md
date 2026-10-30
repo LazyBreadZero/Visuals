@@ -15,6 +15,7 @@ Start with [docs/playbook.md](docs/playbook.md) (how to prompt, what to try firs
 | Piece | Link |
 |---|---|
 | Orbital Wireframe | https://lazybreadzero.github.io/Visuals/works/satellite-orbit/ |
+| The Reality Dial (XR explainer, data-viz) | https://lazybreadzero.github.io/Visuals/works/xr-reality/ |
 | Summits Lab (pilot, photographic skies) | https://lazybreadzero.github.io/Visuals/works/summits-lab/ |
 | Between Summits (film, 2:28) | https://lazybreadzero.github.io/Visuals/works/between-summits/ |
 | Concrete Tide (10s) | https://lazybreadzero.github.io/Visuals/works/concrete-tide/ |

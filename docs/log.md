@@ -2,6 +2,13 @@
 
 Read this first when starting a new chat in this repo. Add an entry at the end of every session.
 
+## 2026-10-30 (night 2) - The Reality Dial (XR explainer)
+- Owner: "benched" Summits (their real goal: nudge me to hold a higher standard; that worked). New brief: real-world-useful visual comms, better than PowerPoint: ONE HTML page that walks a person on the street AND a CEO through the state of VR/AR/XR with logos, a theme, trends, past/future, adjacent tech and industries.
+- Built `works/xr-reality` ("The Reality Dial"): scroll story from real (paper) -> virtual (night) -> real; Street/Boardroom switch; primer scene with draggable reality dial; history; 'great inversion' data; players with logos; weight-vs-price scatter; six walls; IDC outlook + derived forecast; convergence map; implications.
+- RESEARCH RULES that mattered: every number sourced; IDC has two trackers, never mix; dropped a figure that wasn't on IDC's page; mark blog/aggregator items 'reported'. Date of data: Q2 2026 (published Sep 2026).
+- Process: independent critic scored v1 3.6/5 (charts small/crowded, hero chart unlabeled, cards template-y, no summary spread, no forecast chart). Fixed hero labels, added Boardroom 'brief' spread + indexed forecast chart, bigger type, swipeable charts on phones. Remaining weaknesses in works/xr-reality/notes.md (no product images, hype curve is a sketch, card grid still SaaS-ish).
+- Bugs worth remembering: duplicate HTML id (#walls) deleted a section; SVG charts need min-width + horizontal scroll on phones instead of shrinking.
+
 ## 2026-10-30 (late) - Summits Lab pilot (pipeline v2 in practice)
 - Owner chose HYBRID style, wants crisp HD, sparkles/shimmer/glimmer, strong sunsets, crisp snowy peaks with clouds; "experiment, find our happy place". Asked for 1-2 scenes redone to iterate on, and for places online to browse art styles (given in works/summits-lab/notes.md).
 - Built `works/summits-lab` (Stillness + Summit, real Poly Haven sky photos, raymarched terrain, bloom). Independent critic agent used; fixed sun direction, cloud layers, water. Weakest remaining: the cloud sea (see notes).
