@@ -2,6 +2,10 @@
 
 Read this first when starting a new chat in this repo. Add an entry at the end of every session.
 
+## 2026-10-30 (night) - Process reset
+- Owner loved Between Summits (sound, timing, text) but called individual assets (posts, mountains, water) "MS Paint". Diagnosis in `docs/pipeline.md`: assets were ~20-line procedural sketches, self-reviewed against my own last frame, one revision pass. Fix: art bible, per-asset tasks with real references, separate critic, >=4 iterations, real CC0 assets (Poly Haven/ambientCG reachable), deliberate style choice.
+- OPEN DECISION for owner: photoreal composite from real assets vs deliberate stylisation (paper-cut/painterly) vs hybrid.
+
 ## 2026-10-30 (evening) - Between Summits (film v2)
 - Owner flagged Concrete Tide as shallow/rigid/too fast and asked for a movie: multiple scenes, fancy visuals, no interactivity, length my choice. They flipped on GitHub Pages: public links are now `https://lazybreadzero.github.io/Visuals/works/<slug>/` (verified 200).
 - KEY LEARNING: Claude has no memory of the owner's past chats. The first film used only a pasted prompt. Fix = owner pasted an LLM-written profile. Their deep material: attention vs stimulation (calm vs chasing intensity), fear of the unglamorous middle / purposelessness, rootless wanting roots, meaning = "make the world feel why this matters", love of summits/waves/launches. Keep private specifics (partner's name, employer, job search) OUT of public pieces.
