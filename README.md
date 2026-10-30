@@ -14,7 +14,8 @@ Start with [docs/playbook.md](docs/playbook.md) (how to prompt, what to try firs
 ## Live pieces
 | Piece | Link |
 |---|---|
-| Orbital Wireframe | https://htmlpreview.github.io/?https://github.com/LazyBreadZero/Visuals/blob/main/works/satellite-orbit/index.html |
-| Concrete Tide (10s) | https://htmlpreview.github.io/?https://github.com/LazyBreadZero/Visuals/blob/main/works/concrete-tide/index.html |
+| Orbital Wireframe | https://lazybreadzero.github.io/Visuals/works/satellite-orbit/ |
+| Between Summits (film, 2:28) | https://lazybreadzero.github.io/Visuals/works/between-summits/ |
+| Concrete Tide (10s) | https://lazybreadzero.github.io/Visuals/works/concrete-tide/ |
 
-Once GitHub Pages is enabled (Settings > Pages > Deploy from branch > main / root) these also live at `https://lazybreadzero.github.io/Visuals/`.
+GitHub Pages is enabled: every piece lives at `https://lazybreadzero.github.io/Visuals/works/<slug>/` after it is merged to `main`.
