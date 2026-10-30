@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+*.log
+# Scratch renders; curated previews live in works/<slug>/preview.png
+.scratch/
