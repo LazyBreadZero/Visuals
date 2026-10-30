@@ -9,8 +9,9 @@ const fs = require('fs');
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a));
 const opt = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 ? args[i + 1] : d; };
-if (!file) { console.error('usage: node scripts/record.js <file.html> [--secs N] [--w N] [--h N] [--out base]'); process.exit(1); }
+if (!file) { console.error('usage: node scripts/record.js <file.html> [--secs N] [--w N] [--h N] [--out base] [--fps 15] [--gw 720]'); process.exit(1); }
 const secs = +opt('secs', 6), w = +opt('w', 960), h = +opt('h', 600);
+const fps = +opt('fps', 15), gw = +opt('gw', 720);
 const base = opt('out', path.join(path.dirname(file), 'preview'));
 const tmp = path.join(path.dirname(base), '.rec');
 
@@ -25,7 +26,7 @@ const tmp = path.join(path.dirname(base), '.rec');
   const webm = fs.readdirSync(tmp).find((f) => f.endsWith('.webm'));
   const src = path.join(tmp, webm);
   execSync(`ffmpeg -y -loglevel error -i "${src}" -c:v libx264 -pix_fmt yuv420p "${base}.mp4"`);
-  execSync(`ffmpeg -y -loglevel error -i "${src}" -vf "fps=15,scale=${Math.min(w, 720)}:-1:flags=lanczos" "${base}.gif"`);
+  execSync(`ffmpeg -y -loglevel error -i "${src}" -vf "fps=${fps},scale=${Math.min(w, gw)}:-1:flags=lanczos" "${base}.gif"`);
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`wrote ${base}.mp4 and ${base}.gif`);
 })();

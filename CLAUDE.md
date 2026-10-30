@@ -36,4 +36,6 @@ This repo is a studio for visuals made *with code*: HTML/CSS/JS, Canvas, SVG, We
 - Tell the owner in plain language what you did, not git jargon.
 
 ## Showing work to the owner
+**Every iteration must end with a working PUBLIC link the owner can open and share** (they asked for this explicitly). After merging to `main`, verify the link returns 200 before giving it. Preferred: GitHub Pages `https://lazybreadzero.github.io/Visuals/works/<slug>/` (check `curl -sI` for 200; the Pages API is blocked from sessions so the owner must enable it once). Fallback: `https://htmlpreview.github.io/?https://github.com/LazyBreadZero/Visuals/blob/main/works/<slug>/index.html`. Also publish the private Artifact for convenience. Give links as plain URLs on their own lines.
+
 After finishing a piece, publish it with the Artifact tool (strip the `<!doctype>/<html>/<head>/<body>` wrapper tags from a copy; keep `<title>`, fonts link, `<style>`, content, scripts) so they get a link they can open and share. Keep the repo file as the source of truth.
