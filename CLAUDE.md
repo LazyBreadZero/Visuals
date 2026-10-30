@@ -2,6 +2,9 @@
 
 This repo is a studio for visuals made *with code*: HTML/CSS/JS, Canvas, SVG, WebGL/Three.js, GLSL shaders, p5.js, D3, Python (matplotlib, etc.). Not AI image generators. The owner is new to this and wants to learn what is possible, so explain choices briefly and say what to try next.
 
+## Process
+For anything beyond a quick sketch, follow `docs/pipeline.md` (art bible, shot list, per-asset passes, critic, QA). Structure was never the weak spot; surface quality is.
+
 ## Layout
 - `works/<slug>/index.html`: one finished piece per folder. Self-contained single file. Optional `meta.json` {title, tags, model, prompt}, `preview.png|gif|mp4`, `notes.md` (what worked and what didn't).
 - `templates/`: verified starters (canvas2d, threejs, p5). Copy one into `works/<slug>/`.
@@ -13,7 +16,7 @@ This repo is a studio for visuals made *with code*: HTML/CSS/JS, Canvas, SVG, We
 1. Before coding, write 2-3 lines: subject, mood, palette (specific hex values), motion idea, interaction. Make one bold choice instead of hedging.
 2. Write one self-contained `index.html`. Pin library versions on CDNs (e.g. `three@0.160.0`, `p5@1.9.4`).
 3. **Render and look.** Run `node scripts/shot.js works/<slug>/index.html --frames 3` and Read the PNGs. Fix console errors. For animation, compare frames to confirm things actually move.
-4. Critique your own output honestly against the brief (composition, contrast, scale, polish, what looks "AI default"), then revise. Do at least one revision pass before presenting. Never present a render you have not looked at.
+4. Critique against REAL REFERENCES (not against your previous attempt) using the rubric in `docs/pipeline.md`. Hero assets need at least 4 iterations and a separate critic pass. Never present a render you have not looked at, and never stop at "better than before".
 5. Check a narrow viewport too (`--w 390 --h 800`).
 6. Save `preview.png` (or run `record.js` for animation), update `meta.json`, run `node scripts/gallery.js`.
 
