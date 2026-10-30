@@ -1,0 +1,6 @@
+{
+  "title": "The Reality Dial",
+  "tags": ["explainer", "infographic", "data-viz", "XR", "scrollytelling", "single-file"],
+  "model": "Claude Sonnet 5.5",
+  "prompt": "A single HTML page that walks a person on the street AND a CEO through the current state of VR/AR/XR: leading companies and logos, a theme, trends, where we were and where we are headed, adjacent technologies and industries. Best of slide decks plus world-class infographics, diagrams and animation."
+}
