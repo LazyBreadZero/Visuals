@@ -2,6 +2,12 @@
 
 Read this first when starting a new chat in this repo. Add an entry at the end of every session.
 
+## 2026-10-30 (evening) - Between Summits (film v2)
+- Owner flagged Concrete Tide as shallow/rigid/too fast and asked for a movie: multiple scenes, fancy visuals, no interactivity, length my choice. They flipped on GitHub Pages: public links are now `https://lazybreadzero.github.io/Visuals/works/<slug>/` (verified 200).
+- KEY LEARNING: Claude has no memory of the owner's past chats. The first film used only a pasted prompt. Fix = owner pasted an LLM-written profile. Their deep material: attention vs stimulation (calm vs chasing intensity), fear of the unglamorous middle / purposelessness, rootless wanting roots, meaning = "make the world feel why this matters", love of summits/waves/launches. Keep private specifics (partner's name, employer, job search) OUT of public pieces.
+- Built `works/between-summits` (2:28, WebGL2, 6 scenes, generative score, captions). Owner has not yet seen/heard it. Ask what moved them least; audio is unverified by me.
+- Owner prefers: slow, graceful, layered, cinematic; hates rigid/cluttered/minimalist-fast. Literal pictograms of hobbies read as shallow; use light, space and rhythm.
+
 ## 2026-10-30 (later) - Concrete Tide
 - Owner brief: 10-second duality animation (cliff diving / pump foiling / backflips vs B2B SaaS / AI terminals), Eco-Brutalism x Terminal Architecture. Built `works/concrete-tide`. Measured exactly 10.000s.
 - Owner loved Orbital Wireframe ("huge success").

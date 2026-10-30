@@ -1,0 +1,6 @@
+{
+  "title": "Between Summits",
+  "tags": ["film", "webgl", "shader", "generative", "audio", "narrative"],
+  "model": "Claude Sonnet 5.5",
+  "prompt": "Multi-scene cinematic short (length my choice, no interaction) that lets a viewer glimpse the owner's inner life: attention vs stimulation, intensity vs the long unglamorous middle, rootlessness and the wish for roots, meaning as making the world feel why it matters. Source: an LLM-written profile pasted by the owner. Private specifics (names, employer, job search) deliberately left out because the link is public."
+}
